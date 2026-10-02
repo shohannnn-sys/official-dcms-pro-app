@@ -1,0 +1,121 @@
+name: Phase 1 Windows architecture proof
+
+on:
+  push:
+    branches:
+      - arena/01a0fe63-official-dcms-pro-app
+    paths:
+      - .github/workflows/phase-1-windows-proof.yml
+      - spikes/phase-1-windows-proof/**
+      - docs/phase-1/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/phase-1-windows-proof.yml
+      - spikes/phase-1-windows-proof/**
+      - docs/phase-1/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-proof:
+    name: Windows MSVC, SQLCipher, DPAPI and WebView2 PDF
+    runs-on: windows-2022
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      CARGO_TARGET_DIR: ${{ runner.temp }}/dcms-phase1-target
+      PROOF_DIR: ${{ runner.temp }}/dcms-phase1-proof
+    steps:
+      - name: Check out proof source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up pinned Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+        with:
+          toolchain: 1.95.0
+          cache: false
+
+      - name: Record hosted Windows and WebView2 versions
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:PROOF_DIR | Out-Null
+          $os = Get-CimInstance Win32_OperatingSystem
+          $runtimeRoot = Join-Path ${env:ProgramFiles(x86)} 'Microsoft\EdgeWebView\Application'
+          if (-not (Test-Path $runtimeRoot)) {
+            throw 'The pinned windows-2022 runner has no registered Evergreen WebView2 runtime.'
+          }
+          $runtime = Get-ChildItem $runtimeRoot -Directory |
+            Where-Object { $_.Name -match '^\d+(\.\d+){3}$' } |
+            Sort-Object { [version]$_.Name } |
+            Select-Object -Last 1
+          if (-not $runtime) { throw 'Unable to identify the WebView2 runtime version.' }
+          @(
+            "OS=$($os.Caption) $($os.Version) build $($os.BuildNumber)"
+            "WebView2Runtime=$($runtime.Name)"
+            "Rust=$(rustc --version)"
+            "RunnerImage=$env:ImageOS $env:ImageVersion"
+          ) | Set-Content (Join-Path $env:PROOF_DIR 'environment.txt')
+          Get-Content (Join-Path $env:PROOF_DIR 'environment.txt')
+
+      - name: Generate first lockfile if absent
+        shell: pwsh
+        run: |
+          $lockPath = 'spikes/phase-1-windows-proof/Cargo.lock'
+          if (-not (Test-Path $lockPath)) {
+            cargo generate-lockfile --manifest-path spikes/phase-1-windows-proof/Cargo.toml
+            if ($LASTEXITCODE -ne 0) { throw 'Cargo lockfile generation failed.' }
+          }
+
+      - name: Run Windows SQLCipher and DPAPI tests
+        shell: pwsh
+        run: cargo test --manifest-path spikes/phase-1-windows-proof/Cargo.toml --locked -- --nocapture
+
+      - name: Build the real Tauri proof window
+        shell: pwsh
+        run: cargo build --manifest-path spikes/phase-1-windows-proof/Cargo.toml --release --locked
+
+      - name: Install pinned test-only PDF inspector
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check --no-input -r spikes/phase-1-windows-proof/requirements-test.txt
+
+      - name: Run local WebView2 A4 PDF stream and Bengali text proof
+        shell: pwsh
+        run: |
+          $env:DCMS_PROOF_PDF = Join-Path $env:PROOF_DIR 'webview2-proof.pdf'
+          $env:DCMS_PROOF_STATUS = Join-Path $env:PROOF_DIR 'webview2-status.txt'
+          $appPath = Join-Path $env:CARGO_TARGET_DIR 'release\dcms-phase1-windows-proof.exe'
+          if (-not (Test-Path $appPath)) { throw "Proof app not found: $appPath" }
+          $app = Start-Process -FilePath $appPath -PassThru
+          if (-not $app.WaitForExit(180000)) {
+            Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+            throw 'Tauri/WebView2 proof did not complete within three minutes.'
+          }
+          if ($app.ExitCode -ne 0) {
+            $status = if (Test-Path $env:DCMS_PROOF_STATUS) { Get-Content $env:DCMS_PROOF_STATUS -Raw } else { 'no status file' }
+            throw "Tauri/WebView2 proof exited $($app.ExitCode): $status"
+          }
+          if (-not (Test-Path $env:DCMS_PROOF_STATUS)) { throw 'WebView2 completion status is missing.' }
+          if ((Get-Content $env:DCMS_PROOF_STATUS -Raw).Trim() -ne 'success') { throw 'WebView2 did not report PDF stream success.' }
+          if (-not (Test-Path $env:DCMS_PROOF_PDF)) { throw 'WebView2 PDF stream did not create its artifact.' }
+          python spikes/phase-1-windows-proof/scripts/verify_pdf.py $env:DCMS_PROOF_PDF
+          if ($LASTEXITCODE -ne 0) { throw 'PDF geometry or text verification failed.' }
+
+      - name: Format-check proof crate
+        shell: pwsh
+        run: cargo fmt --manifest-path spikes/phase-1-windows-proof/Cargo.toml --all -- --check
+
+      - name: Retain proof evidence and generated lockfile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase-1-windows-proof-${{ github.run_id }}
+          path: |
+            spikes/phase-1-windows-proof/Cargo.lock
+            ${{ runner.temp }}/dcms-phase1-proof/**
+          if-no-files-found: warn
+          retention-days: 7

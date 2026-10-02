@@ -1,0 +1,17 @@
+[package]
+name = "dcms-phase1-windows-proof"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[build-dependencies]
+tauri-build = "=2.7.1"
+
+[dependencies]
+rusqlite = { version = "=0.40.2", features = ["backup", "bundled-sqlcipher-vendored-openssl"] }
+tauri = "=2.12.1"
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "=0.39.1"
+windows = { version = "=0.62.2", features = ["Win32_System_Com"] }
