@@ -65,8 +65,8 @@ None. Schema status remains **not started**. The required entity families, integ
 
 - **Working branch:** `arena/01a0fe63-official-dcms-pro-app` (the only permitted session branch).
 - **Starting commit inspected:** `f1a4e0a9469c618a10c25a44ddd0a3e797ba52de`.
-- **Phase 0 content:** documentation-only changes on the Arena branch. The exact branch tip must be read from Git at handoff; see the final completion message and current `git rev-parse HEAD`.
-- **PR:** no PR opened at report authoring. If a Phase 0 documentation PR is prepared, it remains unmerged until the owner decides; the agent will never merge.
+- **Phase 0 content commit:** `caa87a092d836360a4445ce7adbed8f51ee346d8` (documentation-only commit on the Arena branch). The exact current branch tip after PR-status bookkeeping must be read with `git rev-parse HEAD` at handoff.
+- **PR:** [#1](https://github.com/shohannnn-sys/official-dcms-pro-app/pull/1) is open from `arena/01a0fe63-official-dcms-pro-app` to `main`, unmerged. The owner retains the merge decision; the agent will never merge. No application Actions workflow/checks existed at Phase 0.
 - **Release/build:** none; no build commands or release artifact exist yet.
 
 ## Exact next action
