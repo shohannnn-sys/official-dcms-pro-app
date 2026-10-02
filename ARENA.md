@@ -52,7 +52,7 @@ This file is the durable handoff record for this repository. Verify the reposito
 - Build commands: not yet defined; there is no project manifest. Phase 1 will define them, and implementation phases must keep this file current.
 - Release commands/workflows: not yet defined; `.github/workflows/` does not exist. The plan requires Windows GitHub Actions, failing test gates, a production Windows installer, checksums, retained artifacts, and a GitHub Release where permissions allow.
 - Packaging constraint: Windows build, install, WebView2, print, icon and uninstall acceptance need Windows runners/machines. Release must not be described as clean-machine-tested until it has actually been installed and exercised on an isolated supported Windows environment.
-- Phase 0 content commit: `caa87a092d836360a4445ce7adbed8f51ee346d8`. A later handoff-only commit may update PR status; always read the exact branch tip using `git rev-parse HEAD` on resumption.
+- Phase 0 content commit: `caa87a092d836360a4445ce7adbed8f51ee346d8`; PR-status follow-up commit: `b17bc90cc341487979fd82a583af65d7f8903ee1`. Always read the exact current branch tip using `git rev-parse HEAD` on resumption.
 - PR status: Phase 0 documentation PR [#1](https://github.com/shohannnn-sys/official-dcms-pro-app/pull/1) is open from the Arena branch to `main` and is not merged. The owner retains the manual merge decision; never merge. No Actions workflow existed at Phase 0, so do not imply application CI ran.
 
 ## Known decisions, risks and owner-facing gates
